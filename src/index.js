@@ -20,7 +20,9 @@ const CATEGORY_STRENGTH = {
   HIGH_CARD: 1,
   ONE_PAIR: 2,
   TWO_PAIR: 3,
-  THREE_OF_A_KIND: 4
+  THREE_OF_A_KIND: 4,
+  STRAIGHT: 5,
+  FLUSH: 6
 };
 
 export function parseCard(cardText) {
@@ -59,6 +61,51 @@ export function evaluateFiveCardHand(cards) {
   const rankValues = parsed
     .map((card) => RANK_TO_VALUE[card.rank])
     .sort((a, b) => b - a);
+
+  const suits = parsed.map((card) => card.suit);
+  const isFlush = suits.every((suit) => suit === suits[0]);
+
+  const uniqueRanks = [...new Set(rankValues)];
+  let straightHigh = null;
+
+  if (uniqueRanks.length === 5) {
+    let isRegularStraight = true;
+    for (let i = 0; i < uniqueRanks.length - 1; i += 1) {
+      if (uniqueRanks[i] - uniqueRanks[i + 1] !== 1) {
+        isRegularStraight = false;
+        break;
+      }
+    }
+
+    if (isRegularStraight) {
+      straightHigh = uniqueRanks[0];
+    } else {
+      const isWheel =
+        uniqueRanks[0] === 14 &&
+        uniqueRanks[1] === 5 &&
+        uniqueRanks[2] === 4 &&
+        uniqueRanks[3] === 3 &&
+        uniqueRanks[4] === 2;
+
+      if (isWheel) {
+        straightHigh = 5;
+      }
+    }
+  }
+
+  if (isFlush) {
+    return {
+      category: "FLUSH",
+      rankVector: rankValues
+    };
+  }
+
+  if (straightHigh !== null) {
+    return {
+      category: "STRAIGHT",
+      rankVector: [straightHigh]
+    };
+  }
 
   const counts = {};
   for (const rankValue of rankValues) {
