@@ -164,6 +164,20 @@ function cardToText(card) {
   return `${VALUE_TO_RANK[card.value]}${card.suit}`;
 }
 
+function sortByValueDesc(cards) {
+  return [...cards].sort((a, b) => b.value - a.value);
+}
+
+function takeCardsByValue(cards, value, count) {
+  const picked = [];
+  for (const card of cards) {
+    if (card.value === value && picked.length < count) {
+      picked.push(card);
+    }
+  }
+  return picked;
+}
+
 function orderChosen5(rawCards, evaluatedHand) {
   const parsed = rawCards.map((text) => {
     const card = parseCard(text);
@@ -175,6 +189,44 @@ function orderChosen5(rawCards, evaluatedHand) {
     };
   });
 
+  if (evaluatedHand.category === "FOUR_OF_A_KIND") {
+    const [quadValue, kickerValue] = evaluatedHand.rankVector;
+    return [...takeCardsByValue(parsed, quadValue, 4), ...takeCardsByValue(parsed, kickerValue, 1)].map(cardToText);
+  }
+
+  if (evaluatedHand.category === "FULL_HOUSE") {
+    const [tripValue, pairValue] = evaluatedHand.rankVector;
+    return [...takeCardsByValue(parsed, tripValue, 3), ...takeCardsByValue(parsed, pairValue, 2)].map(cardToText);
+  }
+
+  if (evaluatedHand.category === "THREE_OF_A_KIND") {
+    const [tripValue, kickerA, kickerB] = evaluatedHand.rankVector;
+    return [
+      ...takeCardsByValue(parsed, tripValue, 3),
+      ...takeCardsByValue(parsed, kickerA, 1),
+      ...takeCardsByValue(parsed, kickerB, 1)
+    ].map(cardToText);
+  }
+
+  if (evaluatedHand.category === "TWO_PAIR") {
+    const [highPair, lowPair, kicker] = evaluatedHand.rankVector;
+    return [
+      ...takeCardsByValue(parsed, highPair, 2),
+      ...takeCardsByValue(parsed, lowPair, 2),
+      ...takeCardsByValue(parsed, kicker, 1)
+    ].map(cardToText);
+  }
+
+  if (evaluatedHand.category === "ONE_PAIR") {
+    const [pairValue, kickerA, kickerB, kickerC] = evaluatedHand.rankVector;
+    return [
+      ...takeCardsByValue(parsed, pairValue, 2),
+      ...takeCardsByValue(parsed, kickerA, 1),
+      ...takeCardsByValue(parsed, kickerB, 1),
+      ...takeCardsByValue(parsed, kickerC, 1)
+    ].map(cardToText);
+  }
+
   if (evaluatedHand.category === "STRAIGHT" || evaluatedHand.category === "STRAIGHT_FLUSH") {
     const high = evaluatedHand.rankVector[0];
     const wanted = high === 5 ? [5, 4, 3, 2, 14] : [high, high - 1, high - 2, high - 3, high - 4];
@@ -185,7 +237,7 @@ function orderChosen5(rawCards, evaluatedHand) {
     });
   }
 
-  return parsed.sort((a, b) => b.value - a.value).map(cardToText);
+  return sortByValueDesc(parsed).map(cardToText);
 }
 
 export function evaluateBestHandFromSeven(cards) {

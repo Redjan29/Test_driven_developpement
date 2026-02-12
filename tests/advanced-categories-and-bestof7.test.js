@@ -31,6 +31,24 @@ describe("advanced categories", () => {
 
     expect(compareHands(fullHouse, flush)).toBe(1);
   });
+
+  it("compares full houses by trips first, then pair", () => {
+    const handA = evaluateFiveCardHand(["AS", "AD", "AH", "KC", "KD"]);
+    const handB = evaluateFiveCardHand(["KS", "KD", "KH", "AC", "AD"]);
+    const handC = evaluateFiveCardHand(["AH", "AD", "AS", "QC", "QD"]);
+
+    expect(compareHands(handA, handB)).toBe(1);
+    expect(compareHands(handA, handC)).toBe(1);
+  });
+
+  it("compares four of a kind by quads first, then kicker", () => {
+    const handA = evaluateFiveCardHand(["7S", "7D", "7H", "7C", "AD"]);
+    const handB = evaluateFiveCardHand(["6S", "6D", "6H", "6C", "KD"]);
+    const handC = evaluateFiveCardHand(["7S", "7D", "7H", "7C", "QD"]);
+
+    expect(compareHands(handA, handB)).toBe(1);
+    expect(compareHands(handA, handC)).toBe(1);
+  });
 });
 
 describe("best of seven", () => {
@@ -51,5 +69,12 @@ describe("best of seven", () => {
     expect(best.category).toBe("STRAIGHT");
     expect(best.rankVector).toEqual([9]);
     expect(best.chosen5).toEqual(["9D", "8S", "7H", "6D", "5C"]);
+  });
+
+  it("orders chosen5 for quads as four cards then kicker", () => {
+    const best = evaluateBestHandFromSeven(["7C", "7D", "7H", "7S", "2D", "AC", "KC"]);
+
+    expect(best.category).toBe("FOUR_OF_A_KIND");
+    expect(best.chosen5).toEqual(["7C", "7D", "7H", "7S", "AC"]);
   });
 });
