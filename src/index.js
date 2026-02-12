@@ -16,6 +16,13 @@ const RANK_TO_VALUE = {
   A: 14
 };
 
+const CATEGORY_STRENGTH = {
+  HIGH_CARD: 1,
+  ONE_PAIR: 2,
+  TWO_PAIR: 3,
+  THREE_OF_A_KIND: 4
+};
+
 export function parseCard(cardText) {
   if (typeof cardText !== "string" || cardText.length !== 2) {
     throw new Error("Card must be a 2-character string like AS or TD");
@@ -49,17 +56,69 @@ export function evaluateFiveCardHand(cards) {
   }
 
   const parsed = parseCards(cards);
-  const rankVector = parsed
+  const rankValues = parsed
     .map((card) => RANK_TO_VALUE[card.rank])
     .sort((a, b) => b - a);
 
+  const counts = {};
+  for (const rankValue of rankValues) {
+    counts[rankValue] = (counts[rankValue] ?? 0) + 1;
+  }
+
+  const entries = Object.entries(counts).map(([rank, count]) => ({
+    rank: Number(rank),
+    count
+  }));
+
+  const trips = entries
+    .filter((entry) => entry.count === 3)
+    .map((entry) => entry.rank)
+    .sort((a, b) => b - a);
+
+  if (trips.length === 1) {
+    const kickers = rankValues.filter((value) => value !== trips[0]);
+    return {
+      category: "THREE_OF_A_KIND",
+      rankVector: [trips[0], ...kickers]
+    };
+  }
+
+  const pairs = entries
+    .filter((entry) => entry.count === 2)
+    .map((entry) => entry.rank)
+    .sort((a, b) => b - a);
+
+  if (pairs.length === 2) {
+    const kicker = rankValues.find((value) => value !== pairs[0] && value !== pairs[1]);
+    return {
+      category: "TWO_PAIR",
+      rankVector: [pairs[0], pairs[1], kicker]
+    };
+  }
+
+  if (pairs.length === 1) {
+    const kickers = rankValues.filter((value) => value !== pairs[0]);
+    return {
+      category: "ONE_PAIR",
+      rankVector: [pairs[0], ...kickers]
+    };
+  }
+
   return {
     category: "HIGH_CARD",
-    rankVector
+    rankVector: rankValues
   };
 }
 
 export function compareHands(handA, handB) {
+  if (CATEGORY_STRENGTH[handA.category] > CATEGORY_STRENGTH[handB.category]) {
+    return 1;
+  }
+
+  if (CATEGORY_STRENGTH[handA.category] < CATEGORY_STRENGTH[handB.category]) {
+    return -1;
+  }
+
   const maxLength = Math.max(handA.rankVector.length, handB.rankVector.length);
 
   for (let i = 0; i < maxLength; i += 1) {
