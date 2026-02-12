@@ -16,13 +16,32 @@ const RANK_TO_VALUE = {
   A: 14
 };
 
+const VALUE_TO_RANK = {
+  2: "2",
+  3: "3",
+  4: "4",
+  5: "5",
+  6: "6",
+  7: "7",
+  8: "8",
+  9: "9",
+  10: "T",
+  11: "J",
+  12: "Q",
+  13: "K",
+  14: "A"
+};
+
 const CATEGORY_STRENGTH = {
   HIGH_CARD: 1,
   ONE_PAIR: 2,
   TWO_PAIR: 3,
   THREE_OF_A_KIND: 4,
   STRAIGHT: 5,
-  FLUSH: 6
+  FLUSH: 6,
+  FULL_HOUSE: 7,
+  FOUR_OF_A_KIND: 8,
+  STRAIGHT_FLUSH: 9
 };
 
 export function parseCard(cardText) {
@@ -93,6 +112,53 @@ export function evaluateFiveCardHand(cards) {
     }
   }
 
+  const counts = {};
+  for (const rankValue of rankValues) {
+    counts[rankValue] = (counts[rankValue] ?? 0) + 1;
+  }
+
+  const entries = Object.entries(counts).map(([rank, count]) => ({
+    rank: Number(rank),
+    count
+  }));
+
+  const quads = entries
+    .filter((entry) => entry.count === 4)
+    .map((entry) => entry.rank)
+    .sort((a, b) => b - a);
+
+  const pairs = entries
+    .filter((entry) => entry.count === 2)
+    .map((entry) => entry.rank)
+    .sort((a, b) => b - a);
+
+  if (isFlush && straightHigh !== null) {
+    return {
+      category: "STRAIGHT_FLUSH",
+      rankVector: [straightHigh]
+    };
+  }
+
+  if (quads.length === 1) {
+    const kicker = rankValues.find((value) => value !== quads[0]);
+    return {
+      category: "FOUR_OF_A_KIND",
+      rankVector: [quads[0], kicker]
+    };
+  }
+
+  const trips = entries
+    .filter((entry) => entry.count === 3)
+    .map((entry) => entry.rank)
+    .sort((a, b) => b - a);
+
+  if (trips.length === 1 && pairs.length === 1) {
+    return {
+      category: "FULL_HOUSE",
+      rankVector: [trips[0], pairs[0]]
+    };
+  }
+
   if (isFlush) {
     return {
       category: "FLUSH",
@@ -107,21 +173,6 @@ export function evaluateFiveCardHand(cards) {
     };
   }
 
-  const counts = {};
-  for (const rankValue of rankValues) {
-    counts[rankValue] = (counts[rankValue] ?? 0) + 1;
-  }
-
-  const entries = Object.entries(counts).map(([rank, count]) => ({
-    rank: Number(rank),
-    count
-  }));
-
-  const trips = entries
-    .filter((entry) => entry.count === 3)
-    .map((entry) => entry.rank)
-    .sort((a, b) => b - a);
-
   if (trips.length === 1) {
     const kickers = rankValues.filter((value) => value !== trips[0]);
     return {
@@ -129,11 +180,6 @@ export function evaluateFiveCardHand(cards) {
       rankVector: [trips[0], ...kickers]
     };
   }
-
-  const pairs = entries
-    .filter((entry) => entry.count === 2)
-    .map((entry) => entry.rank)
-    .sort((a, b) => b - a);
 
   if (pairs.length === 2) {
     const kicker = rankValues.find((value) => value !== pairs[0] && value !== pairs[1]);
@@ -182,4 +228,69 @@ export function compareHands(handA, handB) {
   }
 
   return 0;
+}
+
+function cardToText(card) {
+  return `${VALUE_TO_RANK[card.value]}${card.suit}`;
+}
+
+function orderChosen5(rawCards, evaluatedHand) {
+  const parsed = rawCards.map((text) => {
+    const card = parseCard(text);
+    return {
+      text: `${card.rank}${card.suit}`,
+      rank: card.rank,
+      suit: card.suit,
+      value: RANK_TO_VALUE[card.rank]
+    };
+  });
+
+  if (evaluatedHand.category === "STRAIGHT" || evaluatedHand.category === "STRAIGHT_FLUSH") {
+    const high = evaluatedHand.rankVector[0];
+    const wanted = high === 5 ? [5, 4, 3, 2, 14] : [high, high - 1, high - 2, high - 3, high - 4];
+
+    return wanted.map((value) => {
+      const card = parsed.find((candidate) => candidate.value === value);
+      return cardToText(card);
+    });
+  }
+
+  return parsed.sort((a, b) => b.value - a.value).map(cardToText);
+}
+
+export function evaluateBestHandFromSeven(cards) {
+  if (!Array.isArray(cards) || cards.length !== 7) {
+    throw new Error("A 7-card hand is required");
+  }
+
+  const normalized = cards.map((card) => {
+    const parsed = parseCard(card);
+    return `${parsed.rank}${parsed.suit}`;
+  });
+
+  let bestResult = null;
+  let bestCards = null;
+
+  for (let a = 0; a < normalized.length - 4; a += 1) {
+    for (let b = a + 1; b < normalized.length - 3; b += 1) {
+      for (let c = b + 1; c < normalized.length - 2; c += 1) {
+        for (let d = c + 1; d < normalized.length - 1; d += 1) {
+          for (let e = d + 1; e < normalized.length; e += 1) {
+            const current = [normalized[a], normalized[b], normalized[c], normalized[d], normalized[e]];
+            const currentEval = evaluateFiveCardHand(current);
+
+            if (!bestResult || compareHands(currentEval, bestResult) > 0) {
+              bestResult = currentEval;
+              bestCards = current;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    ...bestResult,
+    chosen5: orderChosen5(bestCards, bestResult)
+  };
 }
